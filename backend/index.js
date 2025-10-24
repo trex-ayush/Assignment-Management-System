@@ -15,6 +15,13 @@ const port = process.env.PORT || 3000;
 app.use(express.json());
 app.use(cookieParser());
 
+const allowedOrigin = process.env.CLIENT_URL;
+
+app.use(cors({
+  origin: allowedOrigin,
+  credentials: true
+}));
+
 app.use("/api/auth", authRoutes);
 app.use("/api/assignments", assignmentRoutes);
 app.use("/api/groups", groupRoutes);
