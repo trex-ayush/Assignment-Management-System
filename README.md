@@ -30,6 +30,26 @@ A role-based system enabling students to form groups, manage members, and submit
 
 **Database** PostgreSQL 14+, pg (node-postgres)
 
+## 📸 Screenshots
+
+### 👨‍🏫 Professor 
+<img width="1919" height="967" alt="image" src="https://github.com/user-attachments/assets/41e8d969-2777-442f-bde8-a2ea71afa638" />
+<img width="1919" height="969" alt="image" src="https://github.com/user-attachments/assets/02b0dfcd-ea91-4f16-a666-7cd2b43c7887" />
+<img width="1919" height="972" alt="image" src="https://github.com/user-attachments/assets/29d70d22-2fd0-48bc-aa6f-c21edae0bd0f" />
+<img width="1919" height="969" alt="image" src="https://github.com/user-attachments/assets/b91778ad-8055-4cd6-bb42-acc98e9e2812" />
+<img width="1919" height="970" alt="image" src="https://github.com/user-attachments/assets/2febb71f-690a-4409-8fcf-074c3d0dbac4" />
+<img width="1919" height="965" alt="image" src="https://github.com/user-attachments/assets/7355ed00-bb77-4091-98ff-02f290bfadac" />
+<img width="1900" height="969" alt="image" src="https://github.com/user-attachments/assets/5bc90878-4baf-424b-b6eb-38fdb76c0e9b" />
+
+### 🎓 Student Dashboard
+<img width="1897" height="968" alt="image" src="https://github.com/user-attachments/assets/8ae7ee65-7b12-49d4-a5f0-5a37f5bed222" />
+<img width="1919" height="969" alt="image" src="https://github.com/user-attachments/assets/e05c16c3-7b6b-492e-a6fa-4be656b69a25" />
+<img width="1919" height="970" alt="image" src="https://github.com/user-attachments/assets/1de2c219-0a79-41fe-a506-c13e54ffacf0" />
+<img width="1919" height="970" alt="image" src="https://github.com/user-attachments/assets/972ca5ab-ca74-498d-9cae-7af2941e5f71" />
+
+
+
+
 🚀 Setup & Run Instructions
 ---------------------------
 
@@ -87,58 +107,82 @@ VITE\_API\_URL=http://localhost:3000/api
 
 **Base URL:** `http://localhost:3000/api`
 
-### Authentication
+## 🔐 Authentication Routes (`/auth`)
 
-POST `/auth/register` \- Register user (student/admin)
+| Method | Endpoint | Description | Auth Required | Role |
+|--------|-----------|--------------|----------------|------|
+| `POST` | `/auth/register` | Register a new user (Student or Admin). Admins must provide `adminKey`. | ❌ | All |
+| `POST` | `/auth/login` | Login and receive JWT token. | ❌ | All |
+| `POST` | `/auth/logout` | Logout and invalidate current session. | ✅ | All |
+| `GET`  | `/auth/profile` | Get logged-in user profile. | ✅ | All |
+| `GET`  | `/auth/users?role=student` | Get all users filtered by role. | ✅ | Admin |
 
-POST `/auth/login` \- Login user
+---
 
-GET `/auth/profile` \- Get current user profile
+## 📚 Course Routes (`/courses`)
 
-POST `/auth/logout` \- Logout user
+| Method | Endpoint | Description | Auth Required | Role |
+|--------|-----------|--------------|----------------|------|
+| `POST` | `/courses/` | Create a new course. | ✅ | Admin |
+| `GET`  | `/courses/my-courses` | Get all courses for the logged-in user. | ✅ | All |
+| `GET`  | `/courses/:courseId` | Get detailed info for a specific course. | ✅ | All |
+| `POST` | `/courses/:courseId/enroll` | Enroll a student in a course. | ✅ | Admin |
 
-### Assignments
+---
 
-POST `/assignments` \- Create assignment (Admin)
+## 📝 Assignment Routes (`/assignments`)
 
-GET `/assignments` \- Get all assignments
+| Method | Endpoint | Description | Auth Required | Role |
+|--------|-----------|--------------|----------------|------|
+| `POST` | `/assignments/` | Create a new assignment for a course. | ✅ | Admin |
+| `GET`  | `/assignments/course/:courseId` | Get all assignments for a specific course. | ✅ | All |
+| `GET`  | `/assignments/:assignmentId` | Get details of a specific assignment. | ✅ | All |
+| `PUT`  | `/assignments/:assignmentId` | Update an existing assignment. | ✅ | Admin |
+| `DELETE` | `/assignments/:assignmentId` | Delete an assignment. | ✅ | Admin |
 
-GET `/assignments/:id` \- Get assignment details
+---
 
-PUT `/assignments/:id` \- Update assignment (Admin)
+## 🧑‍🎓 Submission Routes (`/submissions`)
 
-DELETE `/assignments/:id` \- Delete assignment (Admin)
+| Method | Endpoint | Description | Auth Required | Role |
+|--------|-----------|--------------|----------------|------|
+| `POST` | `/submissions/` | Submit an assignment. | ✅ | Student |
+| `GET`  | `/submissions/my-submissions` | Get all submissions of the logged-in student. | ✅ | Student |
+| `GET`  | `/submissions/group/:groupId` | Get all submissions for a specific group. | ✅ | All |
+| `GET`  | `/submissions/status/:assignmentId/:groupId` | Check submission status for a specific assignment and group. | ✅ | All |
+| `DELETE` | `/submissions/:submissionId` | Delete a submission. | ✅ | All |
 
-GET `/assignments/:id/analytics` \- Get analytics (Admin)
+---
 
-### Groups
+## 👥 Group Routes (`/groups`)
 
-POST `/groups` \- Create group (Student)
+| Method | Endpoint | Description | Auth Required | Role |
+|--------|-----------|--------------|----------------|------|
+| `POST` | `/groups/` | Create a new group. | ✅ | Student |
+| `GET`  | `/groups/my-groups` | Get all groups for the logged-in student. | ✅ | Student |
+| `GET`  | `/groups/:groupId` | Get details of a specific group. | ✅ | All |
+| `POST` | `/groups/:groupId/members` | Add a new member to the group. | ✅ | Student |
+| `DELETE` | `/groups/:groupId/members/:memberId` | Remove a member from a group. | ✅ | Student |
+| `GET`  | `/groups/` | Get all groups (Admin only). | ✅ | Admin |
 
-GET `/groups/my-groups` \- Get my groups (Student)
+---
 
-GET `/groups/:id` \- Get group details
+## 🧾 Acknowledgment Routes (`/acknowledgments`)
 
-POST `/groups/:id/members` \- Add member (Student)
+| Method | Endpoint | Description | Auth Required | Role |
+|--------|-----------|--------------|----------------|------|
+| `POST` | `/acknowledgments/` | Acknowledge assignment completion. | ✅ | Student |
 
-DELETE `/groups/:id/members/:memberId` \- Remove member (Student)
+---
 
-### Submissions
+## 📊 Statistics Routes (`/stats`)
 
-POST `/submissions` \- Submit assignment (Student)
+| Method | Endpoint | Description | Auth Required | Role |
+|--------|-----------|--------------|----------------|------|
+| `GET` | `/stats/admin` | Fetch overall system stats for Admin Dashboard. <br>Returns counts of students, groups, assignments, and submissions. | ✅ | Admin |
+| `GET` | `/stats/student` | Fetch student-specific stats: total groups, submissions, and assignments. | ✅ | Student |
 
-GET `/submissions/my-submissions` \- Get my submissions (Student)
-
-GET `/submissions/status/:assignmentId/:groupId` \- Check status
-
-### Stats
-
-GET `/stats/admin` \- Admin dashboard stats
-
-GET `/stats/student` \- Student dashboard stats
-
-## ER Diagram
-<img width="1136" height="945" alt="ER2" src="https://github.com/user-attachments/assets/9a4817be-57e4-4b5b-b7ec-fcb4bbc2a9f0" />
+---
 
 
 
