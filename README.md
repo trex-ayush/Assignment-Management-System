@@ -137,6 +137,10 @@ GET `/stats/admin` \- Admin dashboard stats
 
 GET `/stats/student` \- Student dashboard stats
 
+## ER Diagram
+<img width="1136" height="945" alt="ER2" src="https://github.com/user-attachments/assets/9a4817be-57e4-4b5b-b7ec-fcb4bbc2a9f0" />
+
+
 
 ## 🔄 Request Flow
 
