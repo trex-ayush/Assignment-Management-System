@@ -1,46 +1,34 @@
 const {
   createAssignment,
   findAssignmentById,
-  findAllAssignments,
+  findAssignmentsByCourse,
+  findAssignmentsByCourseForStudent,
   updateAssignment,
   deleteAssignment,
-  getAssignmentTargetGroups,
-  getAssignmentSubmissionStats,
+  getAssignmentStats,
 } = require("../models/assignmentModel");
-const { findSubmissionsByAssignment } = require("../models/submissionModel");
+const { findAcknowledgmentsByAssignment } = require("../models/acknowledgmentModel");
 
 const createAssignmentController = async (req, res) => {
-  const {
-    title,
-    description,
-    due_date,
-    onedrive_link,
-    assign_to_all,
-    target_groups,
-  } = req.body;
+  const { course_id, title, description, deadline, onedrive_link, submission_type } = req.body;
 
   try {
-    if (!title || !description || !due_date || !onedrive_link) {
+    if (!course_id || !title || !description || !deadline || !onedrive_link || !submission_type) {
       return res.status(400).json({ error: "All fields are required" });
     }
 
-    if (
-      assign_to_all === false &&
-      (!target_groups || target_groups.length === 0)
-    ) {
-      return res
-        .status(400)
-        .json({ error: "Please select at least one group" });
+    if (!['individual', 'group'].includes(submission_type)) {
+      return res.status(400).json({ error: "Invalid submission type" });
     }
 
     const assignment = await createAssignment({
+      course_id,
       title: title.trim(),
       description: description.trim(),
-      due_date,
+      deadline,
       onedrive_link,
+      submission_type,
       created_by: req.user.id,
-      assign_to_all: assign_to_all !== false,
-      target_groups: assign_to_all === false ? target_groups : null,
     });
 
     res.status(201).json({
@@ -53,9 +41,14 @@ const createAssignmentController = async (req, res) => {
   }
 };
 
-const getAllAssignmentsController = async (req, res) => {
+const getCourseAssignments = async (req, res) => {
+  const { courseId } = req.params;
+
   try {
-    const assignments = await findAllAssignments();
+    const assignments = req.user.role === 'admin'
+      ? await findAssignmentsByCourse(courseId)
+      : await findAssignmentsByCourseForStudent(courseId, req.user.id);
+
     res.json(assignments);
   } catch (error) {
     console.error("Get assignments error:", error);
@@ -73,14 +66,12 @@ const getAssignmentDetails = async (req, res) => {
       return res.status(404).json({ error: "Assignment not found" });
     }
 
-    const submissions = await findSubmissionsByAssignment(assignmentId);
-    const targetGroups = await getAssignmentTargetGroups(assignmentId);
-    const stats = await getAssignmentSubmissionStats(assignmentId);
+    const acknowledgments = await findAcknowledgmentsByAssignment(assignmentId);
+    const stats = await getAssignmentStats(assignmentId);
 
     res.json({
       assignment,
-      submissions,
-      targetGroups,
+      acknowledgments,
       stats,
     });
   } catch (error) {
@@ -91,24 +82,21 @@ const getAssignmentDetails = async (req, res) => {
 
 const updateAssignmentController = async (req, res) => {
   const { assignmentId } = req.params;
-  const { title, description, due_date, onedrive_link, assign_to_all } =
-    req.body;
+  const { title, description, deadline, onedrive_link, submission_type } = req.body;
 
   try {
     const existing = await findAssignmentById(assignmentId);
 
     if (!existing || existing.created_by !== req.user.id) {
-      return res
-        .status(404)
-        .json({ error: "Assignment not found or unauthorized" });
+      return res.status(404).json({ error: "Assignment not found or unauthorized" });
     }
 
     const assignment = await updateAssignment(assignmentId, {
       title: title?.trim(),
       description: description?.trim(),
-      due_date,
+      deadline,
       onedrive_link,
-      assign_to_all,
+      submission_type,
     });
 
     res.json({
@@ -128,9 +116,7 @@ const deleteAssignmentController = async (req, res) => {
     const existing = await findAssignmentById(assignmentId);
 
     if (!existing || existing.created_by !== req.user.id) {
-      return res
-        .status(404)
-        .json({ error: "Assignment not found or unauthorized" });
+      return res.status(404).json({ error: "Assignment not found or unauthorized" });
     }
 
     await deleteAssignment(assignmentId);
@@ -142,48 +128,10 @@ const deleteAssignmentController = async (req, res) => {
   }
 };
 
-const getAssignmentAnalytics = async (req, res) => {
-  const { assignmentId } = req.params;
-
-  try {
-    const assignment = await findAssignmentById(assignmentId);
-
-    if (!assignment) {
-      return res.status(404).json({ error: "Assignment not found" });
-    }
-
-    const stats = await getAssignmentSubmissionStats(assignmentId);
-    const submissions = await findSubmissionsByAssignment(assignmentId);
-    const targetGroups = await getAssignmentTargetGroups(assignmentId);
-
-    const groupBreakdown = targetGroups.map((group) => {
-      const submission = submissions.find((s) => s.group_id === group.id);
-      return {
-        ...group,
-        submitted: !!submission,
-        submitted_at: submission?.submitted_at,
-        submitted_by_name: submission?.submitted_by_name,
-        group_members: submission?.group_members || [],
-      };
-    });
-
-    res.json({
-      assignment,
-      stats,
-      groupBreakdown,
-      submissions,
-    });
-  } catch (error) {
-    console.error("Get analytics error:", error);
-    res.status(500).json({ error: "Internal server error" });
-  }
-};
-
 module.exports = {
   createAssignmentController,
-  getAllAssignmentsController,
+  getCourseAssignments,
   getAssignmentDetails,
   updateAssignmentController,
   deleteAssignmentController,
-  getAssignmentAnalytics,
 };

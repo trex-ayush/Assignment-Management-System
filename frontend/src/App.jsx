@@ -1,20 +1,18 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { AuthProvider, useAuth } from "./context/AuthContext";
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './context/AuthContext';
 
-// Auth Pages
-import Login from "./pages/auth/Login";
-import Register from "./pages/auth/Register";
+import Login from './pages/auth/Login';
+import Register from './pages/auth/Register';
 
-// Student Pages
-import StudentDashboard from "./pages/student/StudentDashboard";
-import Assignments from "./pages/student/Assignments";
-import MyGroups from "./pages/student/MyGroups";
-import Submissions from "./pages/student/Submissions";
+import StudentDashboard from './pages/student/StudentDashboard';
+import CourseAssignments from './pages/student/CourseAssignments';
+import CourseGroups from './pages/student/CourseGroups';
 
-// Admin Pages
-import AdminDashboard from "./pages/admin/AdminDashboard";
-import ManageAssignments from "./pages/admin/ManageAssignments";
-import ManageGroups from "./pages/admin/ManageGroups";
+import AdminDashboard from './pages/admin/AdminDashboard';
+import ManageCourseAssignments from './pages/admin/ManageCourseAssignments';
+import ManageStudents from './pages/admin/ManageStudents';
+import CreateCourse from './pages/admin/CreateCourse';
+import AssignmentAnalytics from './pages/admin/AssignmentAnalytics';
 
 function ProtectedRoute({ children, role }) {
   const { user, loading } = useAuth();
@@ -22,7 +20,7 @@ function ProtectedRoute({ children, role }) {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-gray-600">Loading...</div>
+        <div className="animate-pulse text-gray-600">Loading...</div>
       </div>
     );
   }
@@ -32,7 +30,7 @@ function ProtectedRoute({ children, role }) {
   }
 
   if (role && user.role !== role) {
-    return <Navigate to={user.role === "admin" ? "/admin" : "/dashboard"} />;
+    return <Navigate to={user.role === 'admin' ? '/admin' : '/dashboard'} />;
   }
 
   return children;
@@ -43,100 +41,20 @@ function AppRoutes() {
 
   return (
     <Routes>
-      <Route
-        path="/login"
-        element={
-          user ? (
-            <Navigate to={user.role === "admin" ? "/admin" : "/dashboard"} />
-          ) : (
-            <Login />
-          )
-        }
-      />
-      <Route
-        path="/register"
-        element={
-          user ? (
-            <Navigate to={user.role === "admin" ? "/admin" : "/dashboard"} />
-          ) : (
-            <Register />
-          )
-        }
-      />
+      <Route path="/login" element={user ? <Navigate to={user.role === 'admin' ? '/admin' : '/dashboard'} /> : <Login />} />
+      <Route path="/register" element={user ? <Navigate to={user.role === 'admin' ? '/admin' : '/dashboard'} /> : <Register />} />
 
-      <Route
-        path="/dashboard"
-        element={
-          <ProtectedRoute role="student">
-            <StudentDashboard />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/assignments"
-        element={
-          <ProtectedRoute role="student">
-            <Assignments />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/groups"
-        element={
-          <ProtectedRoute role="student">
-            <MyGroups />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/submissions"
-        element={
-          <ProtectedRoute role="student">
-            <Submissions />
-          </ProtectedRoute>
-        }
-      />
+      <Route path="/dashboard" element={<ProtectedRoute role="student"><StudentDashboard /></ProtectedRoute>} />
+      <Route path="/courses/:courseId/assignments" element={<ProtectedRoute role="student"><CourseAssignments /></ProtectedRoute>} />
+      <Route path="/courses/:courseId/groups" element={<ProtectedRoute role="student"><CourseGroups /></ProtectedRoute>} />
 
-      <Route
-        path="/admin"
-        element={
-          <ProtectedRoute role="admin">
-            <AdminDashboard />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/admin/assignments"
-        element={
-          <ProtectedRoute role="admin">
-            <ManageAssignments />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/admin/groups"
-        element={
-          <ProtectedRoute role="admin">
-            <ManageGroups />
-          </ProtectedRoute>
-        }
-      />
+      <Route path="/admin" element={<ProtectedRoute role="admin"><AdminDashboard /></ProtectedRoute>} />
+      <Route path="/admin/courses/create" element={<ProtectedRoute role="admin"><CreateCourse /></ProtectedRoute>} />
+      <Route path="/admin/courses/:courseId/assignments" element={<ProtectedRoute role="admin"><ManageCourseAssignments /></ProtectedRoute>} />
+      <Route path="/admin/courses/:courseId/assignments/:assignmentId/analytics" element={<ProtectedRoute role="admin"><AssignmentAnalytics /></ProtectedRoute>} />
+      <Route path="/admin/courses/:courseId/students" element={<ProtectedRoute role="admin"><ManageStudents /></ProtectedRoute>} />
 
-      {/* Default Route */}
-      <Route
-        path="/"
-        element={
-          <Navigate
-            to={
-              user
-                ? user.role === "admin"
-                  ? "/admin"
-                  : "/dashboard"
-                : "/login"
-            }
-          />
-        }
-      />
+      <Route path="/" element={<Navigate to={user ? (user.role === 'admin' ? '/admin' : '/dashboard') : '/login'} />} />
     </Routes>
   );
 }

@@ -1,68 +1,62 @@
 const pool = require("../config/db");
 
 const createAssignment = async ({
+  course_id,
   title,
   description,
-  due_date,
+  deadline,
   onedrive_link,
+  submission_type,
   created_by,
-  assign_to_all,
-  target_groups,
 }) => {
-  const client = await pool.connect();
-
-  try {
-    await client.query("BEGIN");
-
-    const result = await client.query(
-      `INSERT INTO assignments (title, description, due_date, onedrive_link, created_by, assign_to_all) 
-       VALUES ($1, $2, $3, $4, $5, $6) 
-       RETURNING *`,
-      [title, description, due_date, onedrive_link, created_by, assign_to_all !== false]
-    );
-
-    const assignment = result.rows[0];
-
-    if (!assignment.assign_to_all && target_groups && target_groups.length > 0) {
-      for (const groupId of target_groups) {
-        await client.query(
-          `INSERT INTO assignment_groups (assignment_id, group_id) 
-           VALUES ($1, $2)`,
-          [assignment.id, groupId]
-        );
-      }
-    }
-
-    await client.query("COMMIT");
-    return assignment;
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
+  const result = await pool.query(
+    `INSERT INTO assignments (course_id, title, description, deadline, onedrive_link, submission_type, created_by) 
+     VALUES ($1, $2, $3, $4, $5, $6, $7) 
+     RETURNING *`,
+    [course_id, title, description, deadline, onedrive_link, submission_type, created_by]
+  );
+  return result.rows[0];
 };
 
 const findAssignmentById = async (id) => {
   const result = await pool.query(
-    `SELECT a.*, u.name as professor_name
+    `SELECT a.*, u.name as professor_name, c.name as course_name, c.code as course_code
      FROM assignments a
      JOIN users u ON a.created_by = u.id
+     JOIN courses c ON a.course_id = c.id
      WHERE a.id = $1`,
     [id]
   );
   return result.rows[0];
 };
 
-const findAllAssignments = async () => {
+const findAssignmentsByCourse = async (courseId) => {
   const result = await pool.query(
     `SELECT a.*, u.name as professor_name,
-            COUNT(DISTINCT s.id) as total_submissions
+            COUNT(DISTINCT ack.id) as total_acknowledgments
      FROM assignments a
      JOIN users u ON a.created_by = u.id
-     LEFT JOIN submissions s ON a.id = s.assignment_id
+     LEFT JOIN acknowledgments ack ON a.id = ack.assignment_id
+     WHERE a.course_id = $1
      GROUP BY a.id, u.name
-     ORDER BY a.due_date DESC`
+     ORDER BY a.deadline DESC`,
+    [courseId]
+  );
+  return result.rows;
+};
+
+const findAssignmentsByCourseForStudent = async (courseId, studentId) => {
+  const result = await pool.query(
+    `SELECT a.*, 
+            u.name as professor_name,
+            CASE WHEN ack.id IS NOT NULL THEN true ELSE false END as is_acknowledged,
+            ack.acknowledged_at
+     FROM assignments a
+     JOIN users u ON a.created_by = u.id
+     LEFT JOIN acknowledgments ack ON a.id = ack.assignment_id AND ack.user_id = $2
+     WHERE a.course_id = $1
+     ORDER BY a.deadline ASC`,
+    [courseId, studentId]
   );
   return result.rows;
 };
@@ -72,7 +66,7 @@ const updateAssignment = async (id, data) => {
   const values = [];
   let paramCount = 1;
 
-  const allowedFields = ["title", "description", "due_date", "onedrive_link", "assign_to_all"];
+  const allowedFields = ["title", "description", "deadline", "onedrive_link", "submission_type"];
 
   allowedFields.forEach((key) => {
     if (data[key] !== undefined) {
@@ -105,57 +99,29 @@ const deleteAssignment = async (id) => {
   return result.rows[0];
 };
 
-const getAssignmentTargetGroups = async (assignmentId) => {
+const getAssignmentStats = async (assignmentId) => {
   const assignment = await findAssignmentById(assignmentId);
-
-  if (assignment.assign_to_all) {
-    const result = await pool.query(
-      `SELECT g.*, COUNT(gm.user_id) as member_count
-       FROM groups g
-       LEFT JOIN group_members gm ON g.id = gm.group_id
-       GROUP BY g.id
-       ORDER BY g.name`
-    );
-    return result.rows;
-  } else {
-    const result = await pool.query(
-      `SELECT g.*, COUNT(gm.user_id) as member_count
-       FROM groups g
-       JOIN assignment_groups ag ON g.id = ag.group_id
-       LEFT JOIN group_members gm ON g.id = gm.group_id
-       WHERE ag.assignment_id = $1
-       GROUP BY g.id
-       ORDER BY g.name`,
-      [assignmentId]
-    );
-    return result.rows;
-  }
-};
-
-const getAssignmentSubmissionStats = async (assignmentId) => {
-  const assignment = await findAssignmentById(assignmentId);
-
-  if (assignment.assign_to_all) {
+  
+  if (assignment.submission_type === 'individual') {
     const result = await pool.query(
       `SELECT 
-         (SELECT COUNT(*) FROM groups) as total_groups,
-         COUNT(DISTINCT s.id) as submitted_count,
-         (SELECT COUNT(*) FROM groups) - COUNT(DISTINCT s.id) as pending_count
-       FROM submissions s
-       WHERE s.assignment_id = $1`,
-      [assignmentId]
+         (SELECT COUNT(*) FROM course_enrollments WHERE course_id = $1) as total_students,
+         COUNT(DISTINCT ack.user_id) as acknowledged_count,
+         (SELECT COUNT(*) FROM course_enrollments WHERE course_id = $1) - COUNT(DISTINCT ack.user_id) as pending_count
+       FROM acknowledgments ack
+       WHERE ack.assignment_id = $2`,
+      [assignment.course_id, assignmentId]
     );
     return result.rows[0];
   } else {
     const result = await pool.query(
       `SELECT 
-         COUNT(DISTINCT ag.group_id) as total_groups,
-         COUNT(DISTINCT s.id) as submitted_count,
-         COUNT(DISTINCT ag.group_id) - COUNT(DISTINCT s.id) as pending_count
-       FROM assignment_groups ag
-       LEFT JOIN submissions s ON s.assignment_id = ag.assignment_id AND s.group_id = ag.group_id
-       WHERE ag.assignment_id = $1`,
-      [assignmentId]
+         (SELECT COUNT(*) FROM groups WHERE course_id = $1) as total_groups,
+         COUNT(DISTINCT ack.group_id) as acknowledged_count,
+         (SELECT COUNT(*) FROM groups WHERE course_id = $1) - COUNT(DISTINCT ack.group_id) as pending_count
+       FROM acknowledgments ack
+       WHERE ack.assignment_id = $2 AND ack.group_id IS NOT NULL`,
+      [assignment.course_id, assignmentId]
     );
     return result.rows[0];
   }
@@ -164,9 +130,9 @@ const getAssignmentSubmissionStats = async (assignmentId) => {
 module.exports = {
   createAssignment,
   findAssignmentById,
-  findAllAssignments,
+  findAssignmentsByCourse,
+  findAssignmentsByCourseForStudent,
   updateAssignment,
   deleteAssignment,
-  getAssignmentTargetGroups,
-  getAssignmentSubmissionStats,
+  getAssignmentStats,
 };

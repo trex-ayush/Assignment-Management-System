@@ -1,16 +1,16 @@
 const pool = require("../config/db");
 
-const createGroup = async ({ name, creator_id }) => {
+const createGroup = async ({ name, creator_id, course_id }) => {
   const client = await pool.connect();
 
   try {
     await client.query("BEGIN");
 
     const groupResult = await client.query(
-      `INSERT INTO groups (name, creator_id) 
-       VALUES ($1, $2) 
+      `INSERT INTO groups (name, creator_id, course_id) 
+       VALUES ($1, $2, $3) 
        RETURNING *`,
-      [name, creator_id]
+      [name, creator_id, course_id]
     );
 
     const group = groupResult.rows[0];
@@ -45,12 +45,14 @@ const findGroupById = async (id) => {
 const findGroupsByUserId = async (userId) => {
   const result = await pool.query(
     `SELECT g.*, u.name as creator_name,
-            COUNT(DISTINCT gm.user_id) as member_count
+            COUNT(DISTINCT gm.user_id) as member_count,
+            CASE WHEN gm_leader.user_id = $1 THEN true ELSE false END as is_leader
      FROM groups g
      JOIN users u ON g.creator_id = u.id
      JOIN group_members gm ON g.id = gm.group_id
+     LEFT JOIN group_members gm_leader ON g.id = gm_leader.group_id AND gm_leader.user_id = $1 AND gm_leader.role = 'leader'
      WHERE gm.user_id = $1
-     GROUP BY g.id, u.name
+     GROUP BY g.id, u.name, gm_leader.user_id
      ORDER BY g.created_at DESC`,
     [userId]
   );

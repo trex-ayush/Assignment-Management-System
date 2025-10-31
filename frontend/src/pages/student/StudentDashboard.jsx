@@ -1,32 +1,38 @@
-import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
-import Layout from "../../components/layout/Layout";
-import Card from "../../components/common/Card";
-import { statsAPI, assignmentAPI, groupAPI } from "../../services/api";
+import { useState, useEffect } from 'react';
+import Layout from '../../components/layout/Layout';
+import CourseCard from '../../components/student/CourseCard';
+import ProgressBar from '../../components/common/ProgressBar';
+import { useAuth } from '../../context/AuthContext';
+import { courseAPI } from '../../services/api';
 
 export default function StudentDashboard() {
+  const { user } = useAuth();
+  const [courses, setCourses] = useState([]);
   const [stats, setStats] = useState(null);
-  const [recentAssignments, setRecentAssignments] = useState([]);
-  const [myGroups, setMyGroups] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadDashboardData();
+    loadDashboard();
   }, []);
 
-  const loadDashboardData = async () => {
+  const loadDashboard = async () => {
     try {
-      const [statsRes, assignmentsRes, groupsRes] = await Promise.all([
-        statsAPI.getStudentStats(),
-        assignmentAPI.getAll(),
-        groupAPI.getMyGroups(),
-      ]);
+      const response = await courseAPI.getMyCourses();
+      setCourses(response.data);
 
-      setStats(statsRes.data);
-      setRecentAssignments(assignmentsRes.data.slice(0, 5));
-      setMyGroups(groupsRes.data.slice(0, 3));
+      const totalAssignments = response.data.reduce((sum, c) => sum + (c.total_assignments || 0), 0);
+      const acknowledgedCount = response.data.reduce((sum, c) => sum + (c.acknowledged_count || 0), 0);
+      const pendingCount = totalAssignments - acknowledgedCount;
+
+      setStats({
+        total_courses: response.data.length,
+        total_assignments: totalAssignments,
+        acknowledged: acknowledgedCount,
+        pending: pendingCount,
+        overall_progress: totalAssignments > 0 ? Math.round((acknowledgedCount / totalAssignments) * 100) : 0,
+      });
     } catch (err) {
-      console.error("Failed to load dashboard:", err);
+      console.error('Failed to load dashboard:', err);
     } finally {
       setLoading(false);
     }
@@ -36,7 +42,7 @@ export default function StudentDashboard() {
     return (
       <Layout>
         <div className="flex justify-center items-center h-64">
-          <div className="text-gray-600">Loading...</div>
+          <div className="animate-pulse text-gray-600">Loading your dashboard...</div>
         </div>
       </Layout>
     );
@@ -44,112 +50,64 @@ export default function StudentDashboard() {
 
   return (
     <Layout>
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-800">Student Dashboard</h1>
-        <p className="text-gray-600 mt-2">
-          Welcome back! Here's your overview.
-        </p>
+      <div className="mb-8 animate-fadeIn">
+        <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-2">
+          Welcome back, {user?.name}! 👋
+        </h1>
+        <p className="text-gray-600">Here's your academic overview for this semester</p>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <Card>
-          <div className="text-center">
-            <p className="text-gray-600 text-sm mb-2">My Groups</p>
-            <p className="text-4xl font-bold text-primary-600">
-              {stats?.my_groups || 0}
-            </p>
-          </div>
-        </Card>
-
-        <Card>
-          <div className="text-center">
-            <p className="text-gray-600 text-sm mb-2">Total Assignments</p>
-            <p className="text-4xl font-bold text-primary-600">
-              {stats?.total_assignments || 0}
-            </p>
-          </div>
-        </Card>
-
-        <Card>
-          <div className="text-center">
-            <p className="text-gray-600 text-sm mb-2">My Submissions</p>
-            <p className="text-4xl font-bold text-green-600">
-              {stats?.my_submissions || 0}
-            </p>
-          </div>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Recent Assignments */}
-        <div>
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold">Recent Assignments</h2>
-            <Link
-              to="/assignments"
-              className="text-primary-600 hover:underline text-sm"
-            >
-              View All
-            </Link>
-          </div>
-          <div className="space-y-3">
-            {recentAssignments.length === 0 ? (
-              <Card>
-                <p className="text-gray-500 text-center">No assignments yet</p>
-              </Card>
-            ) : (
-              recentAssignments.map((assignment) => (
-                <Card key={assignment.id}>
-                  <h3 className="font-bold mb-1">{assignment.title}</h3>
-                  <p className="text-sm text-gray-600 line-clamp-1">
-                    {assignment.description}
-                  </p>
-                  <p className="text-sm text-gray-500 mt-2">
-                    Due: {new Date(assignment.due_date).toLocaleDateString()}
-                  </p>
-                </Card>
-              ))
-            )}
-          </div>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="card text-center animate-slideIn" style={{ animationDelay: '0.1s' }}>
+          <div className="text-3xl mb-2">📚</div>
+          <p className="text-2xl font-bold text-blue-600">{stats?.total_courses}</p>
+          <p className="text-sm text-gray-600">Enrolled Courses</p>
         </div>
-
-        {/* My Groups */}
-        <div>
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold">My Groups</h2>
-            <Link
-              to="/groups"
-              className="text-primary-600 hover:underline text-sm"
-            >
-              View All
-            </Link>
-          </div>
-          <div className="space-y-3">
-            {myGroups.length === 0 ? (
-              <Card>
-                <p className="text-gray-500 text-center">No groups yet</p>
-              </Card>
-            ) : (
-              myGroups.map((group) => (
-                <Card key={group.id}>
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <h3 className="font-bold">{group.name}</h3>
-                      <p className="text-sm text-gray-600">
-                        {group.member_count} members
-                      </p>
-                    </div>
-                    <span className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded">
-                      {group.creator_name}
-                    </span>
-                  </div>
-                </Card>
-              ))
-            )}
-          </div>
+        <div className="card text-center animate-slideIn" style={{ animationDelay: '0.2s' }}>
+          <div className="text-3xl mb-2">📝</div>
+          <p className="text-2xl font-bold text-indigo-600">{stats?.total_assignments}</p>
+          <p className="text-sm text-gray-600">Total Assignments</p>
+        </div>
+        <div className="card text-center animate-slideIn" style={{ animationDelay: '0.3s' }}>
+          <div className="text-3xl mb-2">✅</div>
+          <p className="text-2xl font-bold text-green-600">{stats?.acknowledged}</p>
+          <p className="text-sm text-gray-600">Acknowledged</p>
+        </div>
+        <div className="card text-center animate-slideIn" style={{ animationDelay: '0.4s' }}>
+          <div className="text-3xl mb-2">⏳</div>
+          <p className="text-2xl font-bold text-yellow-600">{stats?.pending}</p>
+          <p className="text-sm text-gray-600">Pending</p>
         </div>
       </div>
+
+      <div className="card mb-8 animate-slideIn" style={{ animationDelay: '0.5s' }}>
+        <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
+          <span>📊</span> Overall Progress
+        </h2>
+        <ProgressBar 
+          percentage={stats?.overall_progress || 0} 
+          label="Semester Completion"
+        />
+      </div>
+
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold text-gray-800 mb-4">My Courses</h2>
+      </div>
+
+      {courses.length === 0 ? (
+        <div className="card text-center py-12">
+          <div className="text-6xl mb-4">📚</div>
+          <p className="text-gray-500 text-lg">No courses enrolled yet</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {courses.map((course, index) => (
+            <div key={course.id} style={{ animationDelay: `${0.6 + index * 0.1}s` }}>
+              <CourseCard course={course} />
+            </div>
+          ))}
+        </div>
+      )}
     </Layout>
   );
 }

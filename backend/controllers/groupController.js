@@ -12,18 +12,21 @@ const {
 const { findUserByEmail } = require("../models/userModel");
 
 const createGroupController = async (req, res) => {
-  const { name } = req.body;
+  const { name, course_id } = req.body;
 
   try {
     if (!name || name.trim().length < 3) {
-      return res
-        .status(400)
-        .json({ error: "Group name must be at least 3 characters" });
+      return res.status(400).json({ error: "Group name must be at least 3 characters" });
+    }
+
+    if (!course_id) {
+      return res.status(400).json({ error: "Course ID is required" });
     }
 
     const group = await createGroup({
       name: name.trim(),
       creator_id: req.user.id,
+      course_id: parseInt(course_id),
     });
 
     res.status(201).json({
